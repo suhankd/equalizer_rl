@@ -1,4 +1,5 @@
-# evaluation/params.py
+import core
+globals().update(vars(core))
 
 from dataclasses import dataclass
 
@@ -6,11 +7,11 @@ from dataclasses import dataclass
 @dataclass
 class CTLEParams:
 
-    W: float = 99.6
+    W: float = 100.0
     L: float = 0.15
 
-    Rs: float = 50.5
-    Cs: float = 3.3e-12
+    Rs: float = 80.0
+    Cs: float = 1.2e-12
 
-    Rd: float = 80
-    Ibias: float = 1.25e-3
+    Rd: float = 100.0
+    Ibias: float = 1.5e-3

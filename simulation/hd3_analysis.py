@@ -2,10 +2,15 @@ import core
 globals().update(vars(core))
 
 from circuits.ctle import ctle
-from simulation.frequency_response import *
-from simulation.hd3_analysis import *
 
-def hd3_analysis():
+def hd3_analysis(
+    W=99.6,
+    L=0.15,
+    Rs=50.5,
+    Cs=3.3e-12,
+    Rd=80,
+    Ibias=1.25e-3
+    ):
 
     circuit = Circuit("CTLE")
 
@@ -13,12 +18,12 @@ def hd3_analysis():
 
     circuit.subcircuit(
         ctle(
-            W=99.6,
-            L=0.15,
-            Rs=50.5,
-            Cs=3.3e-12,
-            Rd=80,
-            Ibias=1.25e-3
+            W=W,
+            L=L,
+            Rs=Rs,
+            Cs=Cs,
+            Rd=Rd,
+            Ibias=Ibias
         )
     )
 
@@ -125,19 +130,22 @@ def hd3_analysis():
     HD3 = 20 * np.log10(V3 / V1)
 
 
-    print("N =", N)
-    print("Frequency resolution =", frequency[1] - frequency[0])
+    # print("N =", N)
+    # print("Frequency resolution =", frequency[1] - frequency[0])
 
-    print()
-    print("Fundamental frequency:", frequency[i1])
-    print("Fundamental amplitude:", V1, "V")
+    # print()
+    # print("Fundamental frequency:", frequency[i1])
+    # print("Fundamental amplitude:", V1, "V")
 
-    print()
-    print("Third harmonic frequency:", frequency[i3])
-    print("Third harmonic amplitude:", V3, "V")
+    # print()
+    # print("Third harmonic frequency:", frequency[i3])
+    # print("Third harmonic amplitude:", V3, "V")
 
-    print()
-    print("HD3:", HD3, "dB")
+    # print()
+    # print("HD3:", HD3, "dB")
 
     os.remove("hd3_data.txt")
     os.remove("ctle.sp")
+
+    return HD3
+

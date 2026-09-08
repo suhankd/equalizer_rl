@@ -1,7 +1,56 @@
 import core
 globals().update(vars(core))
 
-def ac_analysis(circuit):
+from circuits.ctle import ctle
+
+def frequency_response(
+    W=99.6,
+    L=0.15,
+    Rs=50.5,
+    Cs=3.3e-12,
+    Rd=100,
+    Ibias=1.25e-3
+    ):
+
+    circuit = Circuit("CTLE")
+
+    circuit.raw_spice += f'.lib "{_PDK_LIB}" tt'
+
+    circuit.subcircuit(
+        ctle(
+            W=W,
+            L=L,
+            Rs=Rs,
+            Cs=Cs,
+            Rd=Rd,
+            Ibias=Ibias
+        )
+    )
+
+    circuit.V(
+        'dd',
+        'vdd',
+        circuit.gnd,
+        1.8 @ u_V
+    )
+
+    circuit.X(
+        'CTLE',
+        'ctle',
+        'vinp',
+        'vinn',
+        'voutp',
+        'voutn',
+        'vdd'
+    )
+
+    circuit.R('Rloadp', 'voutp', '0', 1e3)
+    circuit.R('Rloadn', 'voutn', '0', 1e3)
+
+    circuit.raw_spice += """
+Vvin1 vinp 0 DC 1.2 AC 1m 0
+Vvin2 vinn 0 DC 1.2 AC 1m 180
+"""
 
     simulator = circuit.simulator(
         temperature=27,

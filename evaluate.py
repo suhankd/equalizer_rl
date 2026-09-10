@@ -6,6 +6,7 @@ from circuits.ctle import ctle
 from simulation.frequency_response import *
 from simulation.hd3_analysis import *
 from simulation.eye_analysis import *
+from simulation.noise_analysis import *
 
 params = CTLEParams()
 
@@ -27,3 +28,12 @@ print(hd3_analysis(
     Rd = CTLEParams.Rd,
     Ibias = CTLEParams.Ibias)
 )
+
+print(input_referred_noise(
+    W = CTLEParams.W,
+    L = CTLEParams.L,
+    Rs = CTLEParams.Rs,
+    Cs = CTLEParams.Cs,
+    Rd = CTLEParams.Rd,
+    Ibias = CTLEParams.Ibias
+    ))

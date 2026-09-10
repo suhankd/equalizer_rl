@@ -9,7 +9,8 @@ def frequency_response(
     Rs=50.5,
     Cs=3.3e-12,
     Rd=100,
-    Ibias=1.25e-3
+    Ibias=1.25e-3,
+    save_path=None,
     ):
 
     circuit = Circuit("CTLE")
@@ -73,45 +74,70 @@ Vvin2 vinn 0 DC 1.2 AC 1m 180
 
     freq = np.array(analysis.frequency)
 
-    f_target = 2.5e9  # 2.5 GHz
+    f_nyquist = 2.5e9  # 2.5 GHz
+    f_dc_ref  = 10e6   # lowest simulated freq used as proxy for DC
 
-    gain_at_target = np.interp(
-        np.log10(f_target),
+    gain_at_nyquist = np.interp(
+        np.log10(f_nyquist),
         np.log10(freq),
         gain_db
     )
 
-    print(f"Gain at 2.5 GHz = {gain_at_target:.3f} dB")
+    gain_at_dc = gain_db[0]
 
-    plt.figure(figsize=(8, 5))
-    plt.semilogx(freq, gain_db, label="CTLE")
+    boost_db = gain_at_nyquist - gain_at_dc
 
-    plt.scatter(
-        f_target,
-        gain_at_target,
+    # Find peak frequency
+    peak_idx   = np.argmax(gain_db)
+    peak_freq  = freq[peak_idx]
+    peak_gain  = gain_db[peak_idx]
+
+    print(f"DC gain          = {gain_at_dc:.3f} dB")
+    print(f"Gain at 2.5 GHz  = {gain_at_nyquist:.3f} dB")
+    print(f"Boost            = {boost_db:.3f} dB")
+    print(f"Peak gain        = {peak_gain:.3f} dB  @ {peak_freq/1e9:.3f} GHz")
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.semilogx(freq, gain_db, label="CTLE", linewidth=2)
+
+    ax.scatter(
+        f_nyquist,
+        gain_at_nyquist,
         s=60,
         zorder=5,
-        label=f"2.5 GHz: {gain_at_target:.2f} dB"
+        label=f"2.5 GHz: {gain_at_nyquist:.2f} dB"
     )
 
-    plt.axvline(
-        f_target,
-        linestyle="--",
-        linewidth=1
-    )
+    ax.axvline(f_nyquist, linestyle="--", linewidth=1, color="gray")
 
-    plt.annotate(
-        f"2.5 GHz\n{gain_at_target:.2f} dB",
-        xy=(f_target, gain_at_target),
+    ax.annotate(
+        f"2.5 GHz\n{gain_at_nyquist:.2f} dB",
+        xy=(f_nyquist, gain_at_nyquist),
         xytext=(15, 25),
         textcoords="offset points",
         arrowprops=dict(arrowstyle="->")
     )
 
-    plt.xlabel("Frequency (Hz)")
-    plt.ylabel("Gain (dB)")
-    plt.title("CTLE Frequency Response")
-    plt.grid(True, which="both")
-    plt.legend()
+    ax.set_xlabel("Frequency (Hz)")
+    ax.set_ylabel("Gain (dB)")
+    ax.set_title("CTLE Frequency Response")
+    ax.grid(True, which="both")
+    ax.legend()
 
-    plt.show()
+    if save_path is not None:
+        fig.savefig(save_path, dpi=120, bbox_inches="tight")
+        print(f"[frequency_response] plot saved → {save_path}")
+    else:
+        plt.show()
+
+    plt.close(fig)
+
+    return {
+        "freq":            freq,
+        "gain_db":         gain_db,
+        "gain_at_nyquist": gain_at_nyquist,
+        "boost_db":        boost_db,
+        "peak_freq":       peak_freq,
+        "peak_gain":       peak_gain,
+        "dc_gain":         gain_at_dc,
+    }

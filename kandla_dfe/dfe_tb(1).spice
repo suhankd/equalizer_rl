@@ -1,0 +1,107 @@
+* DFE Testbench - 1 tap with ISI channel and attenuated feedback
+.include /home/kandl/projects/cml_latch_subckt.spice
+
+* LOAD RESISTORS
+Xload1 A vdd GND sky130_fd_pr__res_high_po W=1.41u L=4.4u mult=1 m=1
+Xload2 B vdd GND sky130_fd_pr__res_high_po W=1.41u L=4.4u mult=1 m=1
+
+* ISI CHANNEL
+Rch_p inp ch_p 500
+Cch_p ch_p GND 50f
+Rch_n inn ch_n 500
+Cch_n ch_n GND 50f
+
+* SUMMER PAIR
+XM1 A ch_p iss1_node GND sky130_fd_pr__nfet_01v8 L=0.15 W=5 nf=5 ad='int((nf+1)/2) * W/nf * 0.29' as='int((nf+2)/2) * W/nf * 0.29'
++ pd='2*int((nf+1)/2) * (W/nf + 0.29)' ps='2*int((nf+2)/2) * (W/nf + 0.29)' nrd='0.29 / W' nrs='0.29 / W'
++ sa=0 sb=0 sd=0 mult=1 m=1
+XM2 B ch_n iss1_node GND sky130_fd_pr__nfet_01v8 L=0.15 W=5 nf=5 ad='int((nf+1)/2) * W/nf * 0.29' as='int((nf+2)/2) * W/nf * 0.29'
++ pd='2*int((nf+1)/2) * (W/nf + 0.29)' ps='2*int((nf+2)/2) * (W/nf + 0.29)' nrd='0.29 / W' nrs='0.29 / W'
++ sa=0 sb=0 sd=0 mult=1 m=1
+
+* FEEDBACK ATTENUATOR
+* Latch swings ~2V, we divide by 10
+* so feedback is ~0.2V which is comparable to input
+Rfb_p1 fb_p fb_pa 9k
+Rfb_p2 fb_pa GND 1k
+Rfb_n1 fb_n fb_na 9k
+Rfb_n2 fb_na GND 1k
+
+* FEEDBACK PAIR
+XM3 A fb_pa iss2_node GND sky130_fd_pr__nfet_01v8 L=0.15 W=5 nf=5 ad='int((nf+1)/2) * W/nf * 0.29' as='int((nf+2)/2) * W/nf * 0.29'
++ pd='2*int((nf+1)/2) * (W/nf + 0.29)' ps='2*int((nf+2)/2) * (W/nf + 0.29)' nrd='0.29 / W' nrs='0.29 / W'
++ sa=0 sb=0 sd=0 mult=1 m=1
+XM4 B fb_na iss2_node GND sky130_fd_pr__nfet_01v8 L=0.15 W=5 nf=5 ad='int((nf+1)/2) * W/nf * 0.29' as='int((nf+2)/2) * W/nf * 0.29'
++ pd='2*int((nf+1)/2) * (W/nf + 0.29)' ps='2*int((nf+2)/2) * (W/nf + 0.29)' nrd='0.29 / W' nrs='0.29 / W'
++ sa=0 sb=0 sd=0 mult=1 m=1
+
+* TAIL CURRENTS
+ISS1 iss1_node GND 300u
+ISS2 iss2_node GND 150u
+
+* LATCHES
+Xlatch1 A B outp_l1 outn_l1 ck ckb vdd cml_latch
+Xlatch2 outp_l1 outn_l1 fb_p fb_n ckb ck vdd cml_latch
+
+* POWER SUPPLY
+Vvdd vdd GND 1.8
+
+* CLOCK - 5GHz
+Vck  ck  GND pulse(0.6 1.2 0 10p 10p 90p 200p)
+Vckb ckb GND pulse(1.2 0.6 0 10p 10p 90p 200p)
+
+* INPUT DATA - PRBS pattern at 5Gbps
+Vinp inp GND pwl(
++ 0p    1.3
++ 10p   1.5
++ 200p  1.5
++ 210p  1.3
++ 400p  1.3
++ 410p  1.5
++ 600p  1.5
++ 610p  1.5
++ 800p  1.5
++ 810p  1.3
++ 1000p 1.3
++ 1010p 1.5
++ 1200p 1.5
++ 1210p 1.3
++ 1400p 1.3
++ 1410p 1.3
++ 1600p 1.3
++ 1610p 1.5
++ 1800p 1.5
++ 1810p 1.3
++ 2000p 1.3)
+
+Vinn inn GND pwl(
++ 0p    1.5
++ 10p   1.3
++ 200p  1.3
++ 210p  1.5
++ 400p  1.5
++ 410p  1.3
++ 600p  1.3
++ 610p  1.3
++ 800p  1.3
++ 810p  1.5
++ 1000p 1.5
++ 1010p 1.3
++ 1200p 1.3
++ 1210p 1.5
++ 1400p 1.5
++ 1410p 1.5
++ 1600p 1.5
++ 1610p 1.3
++ 1800p 1.3
++ 1810p 1.5
++ 2000p 1.5)
+
+**** begin user architecture code
+.lib /home/kandl/pdks/volare/sky130/versions/0fe599b2afb6708d281543108caf8310912f54af/sky130A/libs.tech/ngspice/sky130.lib.spice tt
+.tran 0.2p 2n 0 0.2p
+.ic v(A)=1.4 v(B)=1.4 v(outp_l1)=1.4 v(outn_l1)=1.4 v(fb_p)=1.4 v(fb_n)=1.4 v(fb_pa)=1.4 v(fb_na)=1.4
+.save all
+**** end user architecture code
+.GLOBAL GND
+.end

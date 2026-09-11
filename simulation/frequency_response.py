@@ -11,11 +11,14 @@ def frequency_response(
     Rd=100,
     Ibias=1.25e-3,
     save_path=None,
+    Vdd = 1.8,
+    temperature = 27,
+    corner = 'tt'
     ):
 
     circuit = Circuit("CTLE")
 
-    circuit.raw_spice += f'.lib "{_PDK_LIB}" tt'
+    circuit.raw_spice += f'.lib "{_PDK_LIB}" {corner}'
 
     circuit.subcircuit(
         ctle(
@@ -32,7 +35,7 @@ def frequency_response(
         'dd',
         'vdd',
         circuit.gnd,
-        1.8 @ u_V
+        Vdd @ u_V
     )
 
     circuit.X(
@@ -54,7 +57,7 @@ Vvin2 vinn 0 DC 1.2 AC 1m 180
 """
 
     simulator = circuit.simulator(
-        temperature=27,
+        temperature=temperature,
         nominal_temperature=27
     )
 

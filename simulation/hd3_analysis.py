@@ -9,12 +9,15 @@ def hd3_analysis(
     Rs=50.5,
     Cs=3.3e-12,
     Rd=80,
-    Ibias=1.25e-3
+    Ibias=1.25e-3,
+    Vdd = 1.8,
+    temperature = 27,
+    corner = 'tt'
     ):
 
     circuit = Circuit("CTLE")
 
-    circuit.raw_spice += f'.lib "{_PDK_LIB}" tt'
+    circuit.raw_spice += f'.lib "{_PDK_LIB}" {corner}'
 
     circuit.subcircuit(
         ctle(
@@ -31,7 +34,7 @@ def hd3_analysis(
         'dd',
         'vdd',
         circuit.gnd,
-        1.8 @ u_V
+        Vdd @ u_V
     )
 
     circuit.X(
@@ -56,8 +59,9 @@ def hd3_analysis(
 
     netlist = str(circuit)
 
-    netlist += """
+    netlist += f"""
     .control
+    .temp {temperature}
     set filetype=ascii
     tran 10p 1u
     set wr_singlescale

@@ -11,11 +11,14 @@ def input_referred_noise(
     Cs=3.3e-12,
     Rd=100,
     Ibias=1.25e-3,
+    Vdd = 1.8,
+    temperature = 27,
+    corner = 'tt'
 ):
 
     circuit = Circuit("CTLE Noise")
 
-    circuit.raw_spice += f'.lib "{_PDK_LIB}" tt'
+    circuit.raw_spice += f'.lib "{_PDK_LIB}" {corner}'
 
     circuit.subcircuit(
         ctle(
@@ -32,7 +35,7 @@ def input_referred_noise(
         'dd',
         'vdd',
         circuit.gnd,
-        1.8 @ u_V
+        Vdd @ u_V
     )
 
     circuit.X(
@@ -54,7 +57,7 @@ Vdiff vinn vinp DC 0 AC 1
 """
 
     simulator = circuit.simulator(
-        temperature=27,
+        temperature=temperature,
         nominal_temperature=27
     )
 

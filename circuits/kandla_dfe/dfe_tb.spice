@@ -1,5 +1,5 @@
 * DFE Testbench - 1 tap with ISI channel and attenuated feedback
-.include /home/kandl/projects/cml_latch_subckt.spice
+.include cml_latch_subckt.spice
 
 * LOAD RESISTORS
 Xload1 A vdd GND sky130_fd_pr__res_high_po W=1.41u L=4.4u mult=1 m=1
@@ -22,9 +22,9 @@ XM2 B ch_n iss1_node GND sky130_fd_pr__nfet_01v8 L=0.15 W=5 nf=5 ad='int((nf+1)/
 * FEEDBACK ATTENUATOR
 * Latch swings ~2V, we divide by 10
 * so feedback is ~0.2V which is comparable to input
-Rfb_p1 fb_p fb_pa 9k
+Rfb_p1 fb_p fb_pa 29.9k
 Rfb_p2 fb_pa GND 1k
-Rfb_n1 fb_n fb_na 9k
+Rfb_n1 fb_n fb_na 29.9k
 Rfb_n2 fb_na GND 1k
 
 * FEEDBACK PAIR
@@ -98,7 +98,7 @@ Vinn inn GND pwl(
 + 2000p 1.5)
 
 **** begin user architecture code
-.lib /home/kandl/pdks/volare/sky130/versions/0fe599b2afb6708d281543108caf8310912f54af/sky130A/libs.tech/ngspice/sky130.lib.spice tt
+.lib /home/royalewithcheese/.ciel/sky130A/libs.tech/ngspice/sky130.lib.spice tt
 .tran 0.2p 2n 0 0.2p
 .ic v(A)=1.4 v(B)=1.4 v(outp_l1)=1.4 v(outn_l1)=1.4 v(fb_p)=1.4 v(fb_n)=1.4 v(fb_pa)=1.4 v(fb_na)=1.4
 .save all

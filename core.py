@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 
 PDK = "/home/royalewithcheese/.ciel/sky130A"
 
+0.03237
+
 _PDK_NGSPICE_DIR = f"{PDK}/libs.tech/ngspice"
 
 _PDK_LIB = f"{_PDK_NGSPICE_DIR}/sky130.lib.spice"

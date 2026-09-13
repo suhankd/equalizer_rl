@@ -212,7 +212,7 @@ def run():
         print("[llm_optimizer] Running hd3_analysis()…")
         hd3_db = hd3_analysis(**kwargs)
         print(f"HD3 @ 100 MHz = {hd3_db:.2f} dB  (target < −30 dB)\n")
-
+        
         # ── ask Claude ───────────────────────────────────────────────
         current_params_text = read_file(PARAMS_FILE)
         reply = ask_claude(

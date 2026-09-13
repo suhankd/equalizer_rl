@@ -1,3 +1,6 @@
+import core
+globals().update(vars(core))
+
 class channel_section(SubCircuitFactory):
 
     NAME = 'channel_section'

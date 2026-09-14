@@ -4,9 +4,10 @@ llm_optimizer.py  –  5-iteration Claude feedback loop for CTLE sizing.
 Each iteration:
   1. Run frequency_response() → save PNG + collect metrics
   2. Run hd3_analysis()       → get HD3 scalar (dB)
-  3. Send plot image + metrics + current params to Claude (vision API)
-  4. Parse the returned params.py code block and overwrite params.py
-  5. Reload params for the next iteration
+  3. Run eye_opening()        → save eye PNG + collect eye width/height metrics
+  4. Send freq plot + eye plot + metrics + current params to Claude (vision API)
+  5. Parse the returned params.py code block and overwrite params.py
+  6. Reload params for the next iteration
 """
 
 import os
@@ -22,10 +23,12 @@ globals().update(vars(core))
 
 from simulation.frequency_response import frequency_response
 from simulation.hd3_analysis import hd3_analysis
+from simulation.eye_analysis import eye_opening
 
 PARAMS_FILE  = Path("evaluation/params.py")
 SPECS_FILE   = Path("evaluation/specs.py")
 PLOTS_DIR    = Path("optimizer_plots")
+EYE_PLOTS_DIR = Path("eye_plots")
 N_ITERATIONS = 5
 
 
@@ -61,7 +64,9 @@ def ask_claude(
     current_params_text: str,
     freq_metrics: dict,
     hd3_db: float,
-    plot_path: Path,
+    freq_plot_path: Path,
+    eye_metrics: dict,
+    eye_plot_path: Path,
 ) -> str:
 
     client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
@@ -76,6 +81,8 @@ def ask_claude(
     ibias_match = re.search(r'Ibias.*?=\s*([\d.e+-]+)', current_params_text)
     power_mw = 2 * float(ibias_match.group(1)) * 1.8 * 1000 if ibias_match else 0.0
 
+    eye_height_mv = eye_metrics["eye_height"] * 1e3
+
     metrics_summary = (
         f"### Simulation results (iteration {iteration})\n\n"
         f"| Metric            | Value                        | Target                        |\n"
@@ -87,6 +94,9 @@ def ask_claude(
         f"| Peak gain         | {freq_metrics['peak_gain']:.2f} dB @ {freq_metrics['peak_freq']/1e9:.2f} GHz | peak in 1.25–2.5 GHz |\n"
         f"| HD3 @ 100 MHz     | {hd3_db:.2f} dB              | < -30 dB                      |\n"
         f"| Power (est.)      | {power_mw:.1f} mW            | < 15 mW                       |\n"
+        f"| Eye Height        | {eye_height_mv:.1f} mV       | >= 100 mV {'✓ PASS' if eye_metrics['eye_height_pass'] else '✗ FAIL'}  |\n"
+        f"| Eye Width         | {eye_metrics['eye_width']:.3f} UI      | >= 0.4 UI {'✓ PASS' if eye_metrics['eye_width_pass'] else '✗ FAIL'}  |\n"
+        f"| Eye Overall       | {'PASS' if eye_metrics['passed'] else 'FAIL'}                    | Both EH and EW pass           |\n"
     )
 
     user_text = f"""
@@ -94,10 +104,15 @@ def ask_claude(
 
 {metrics_summary}
 
-The frequency-response plot for this iteration is attached as an image. Study the shape carefully:
-- Is the boost in the right frequency range (1.25–2.5 GHz)?
-- Is the boost magnitude within spec (3–12 dB)?
-- Is there excessive peaking or roll-off before Nyquist?
+Two plots are attached as images:
+1. **Frequency-response plot** — Study the boost shape carefully:
+   - Is the boost in the right frequency range (1.25–2.5 GHz)?
+   - Is the boost magnitude within spec (3–12 dB)?
+   - Is there excessive peaking or roll-off before Nyquist?
+2. **Eye diagram** — Study the eye opening carefully:
+   - Is the eye height >= 100 mV?
+   - Is the eye width >= 0.4 UI?
+   - Is the DFE coefficient cancelling ISI effectively, or is it over/under-correcting?
 
 ## Design specs (from `specs.py`)
 ```python
@@ -110,14 +125,15 @@ The frequency-response plot for this iteration is attached as an image. Study th
 ```
 
 ## Parameter constraints (SKY130A)
-| Parameter | Constraint |
-|-----------|-----------|
-| W  | 0.36 … 99.6 µm, multiple of 0.36 µm, **never exceed 99.6 µm** |
-| L  | 0.15 … 2.0 µm |
-| Rs | > 0 Ω |
-| Cs | 0.1 pF … 10 pF |
-| Rd | > 0 Ω |
-| Ibias | 0.1 mA … 5 mA |
+| Parameter       | Constraint |
+|-----------------|------------|
+| W               | 0.36 … 99.6 µm, multiple of 0.36 µm, **never exceed 99.6 µm** |
+| L               | 0.15 … 2.0 µm |
+| Rs              | > 0 Ω |
+| Cs              | 0.1 pF … 10 pF |
+| Rd              | > 0 Ω |
+| Ibias           | 0.1 mA … 5 mA |
+| dfe_coefficient | 0.001 … 0.2 (dimensionless) |
 
 ## Design intuition
 1. **Zero frequency**: `f_z = 1 / (2π·Rs·Cs)` — target ≈ 1–2 GHz for peak at Nyquist.
@@ -125,19 +141,25 @@ The frequency-response plot for this iteration is attached as an image. Study th
 3. **DC gain**: `|Av| ≈ gm·Rd`. Adjust Rd to shift overall level without changing boost shape.
 4. **HD3**: larger W/L and moderate overdrive improves linearity. Increasing Ibias also helps.
 5. **Power**: `P ≈ 2·Ibias·1.8`. Must stay under 15 mW.
+6. **DFE coefficient**: cancels post-cursor ISI. The ideal value equals the ratio of the
+   first post-cursor tap to the main cursor of the channel impulse response.
+   If the eye is open but narrow, try increasing `dfe_coefficient` slightly.
+   If the eye collapses (over-correction), decrease it.
+   Start from the current value and make small, targeted adjustments.
 
 ## Instructions
 
 You are optimizing the CTLE over only 5 iterations.
 
 For this iteration:
-1. Analyze the frequency-response plot and simulation metrics.
-2. Identify the most important problems.
+1. Analyze both the frequency-response plot and the eye diagram.
+2. Identify the most important problems (boost shape, eye height, eye width, HD3).
 3. Choose concrete parameter changes that improve the design.
 4. Prefer small, targeted changes rather than changing every parameter.
 5. The SPICE simulation results are authoritative; the equations above are
    only approximate design intuition.
 6. Respect ALL parameter constraints.
+7. You MUST also tune `dfe_coefficient` if the eye metrics are not passing.
 
 Output the complete updated `params.py` in exactly ONE ```python``` block.
 
@@ -146,9 +168,10 @@ Only change the numeric default values.
 Do not add comments inside the dataclass.
 """
 
-    image_b64 = encode_image(plot_path)
+    freq_image_b64 = encode_image(freq_plot_path)
+    eye_image_b64  = encode_image(eye_plot_path)
 
-    print(f"[llm_optimizer] Iteration {iteration}: sending plot + metrics to Claude…")
+    print(f"[llm_optimizer] Iteration {iteration}: sending freq plot + eye plot + metrics to Claude…")
 
     response = client.messages.create(
         model="claude-opus-4-5",
@@ -163,7 +186,15 @@ Do not add comments inside the dataclass.
                         "source": {
                             "type": "base64",
                             "media_type": "image/png",
-                            "data": image_b64,
+                            "data": freq_image_b64,
+                        },
+                    },
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": eye_image_b64,
                         },
                     },
                     {
@@ -186,6 +217,7 @@ Do not add comments inside the dataclass.
 
 def run():
     PLOTS_DIR.mkdir(exist_ok=True)
+    EYE_PLOTS_DIR.mkdir(exist_ok=True)
 
     for iteration in range(1, N_ITERATIONS + 1):
         print(f"\n{'='*60}")
@@ -204,15 +236,29 @@ def run():
         )
 
         # ── run simulations ──────────────────────────────────────────
-        plot_path = PLOTS_DIR / f"iter_{iteration:02d}_freq_response.png"
+        freq_plot_path = PLOTS_DIR / f"iter_{iteration:02d}_freq_response.png"
+        eye_plot_path  = EYE_PLOTS_DIR / f"iter_{iteration:02d}_eye.png"
 
         print("[llm_optimizer] Running frequency_response()…")
-        freq_metrics = frequency_response(**kwargs, save_path=plot_path)
+        freq_metrics = frequency_response(**kwargs, save_path=freq_plot_path)
 
         print("[llm_optimizer] Running hd3_analysis()…")
         hd3_db = hd3_analysis(**kwargs)
         print(f"HD3 @ 100 MHz = {hd3_db:.2f} dB  (target < −30 dB)\n")
-        
+
+        print("[llm_optimizer] Running eye_opening()…")
+        eye_metrics = eye_opening(
+            **kwargs,
+            coefficient=params.dfe_coefficient,
+            save_path=eye_plot_path,
+        )
+        print(
+            f"Eye height = {eye_metrics['eye_height']*1e3:.1f} mV  "
+            f"({'PASS' if eye_metrics['eye_height_pass'] else 'FAIL'}), "
+            f"Eye width = {eye_metrics['eye_width']:.3f} UI  "
+            f"({'PASS' if eye_metrics['eye_width_pass'] else 'FAIL'})\n"
+        )
+
         # ── ask Claude ───────────────────────────────────────────────
         current_params_text = read_file(PARAMS_FILE)
         reply = ask_claude(
@@ -220,7 +266,9 @@ def run():
             current_params_text=current_params_text,
             freq_metrics=freq_metrics,
             hd3_db=hd3_db,
-            plot_path=plot_path,
+            freq_plot_path=freq_plot_path,
+            eye_metrics=eye_metrics,
+            eye_plot_path=eye_plot_path,
         )
 
         # ── update params.py ─────────────────────────────────────────
@@ -233,8 +281,9 @@ def run():
         write_params(new_params)
 
     print("\n[llm_optimizer] All iterations complete.")
-    print(f"Plots saved in: {PLOTS_DIR.resolve()}")
-    print(f"Final params:   {PARAMS_FILE.resolve()}")
+    print(f"Freq plots saved in : {PLOTS_DIR.resolve()}")
+    print(f"Eye plots saved in  : {EYE_PLOTS_DIR.resolve()}")
+    print(f"Final params        : {PARAMS_FILE.resolve()}")
 
 
 run()

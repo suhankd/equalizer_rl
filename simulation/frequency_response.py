@@ -130,8 +130,8 @@ Vvin2 vinn 0 DC 1.2 AC 1m 180
     if save_path is not None:
         fig.savefig(save_path, dpi=120, bbox_inches="tight")
         print(f"[frequency_response] plot saved → {save_path}")
-    else:
-        plt.show()
+    # else:
+    #     plt.show()
 
     plt.close(fig)
 

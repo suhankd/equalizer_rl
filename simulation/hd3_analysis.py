@@ -134,19 +134,19 @@ def hd3_analysis(
     HD3 = 20 * np.log10(V3 / V1)
 
 
-    # print("N =", N)
-    # print("Frequency resolution =", frequency[1] - frequency[0])
+    print("N =", N)
+    print("Frequency resolution =", frequency[1] - frequency[0])
 
-    # print()
-    # print("Fundamental frequency:", frequency[i1])
-    # print("Fundamental amplitude:", V1, "V")
+    print()
+    print("Fundamental frequency:", frequency[i1])
+    print("Fundamental amplitude:", V1, "V")
 
-    # print()
-    # print("Third harmonic frequency:", frequency[i3])
-    # print("Third harmonic amplitude:", V3, "V")
+    print()
+    print("Third harmonic frequency:", frequency[i3])
+    print("Third harmonic amplitude:", V3, "V")
 
-    # print()
-    # print("HD3:", HD3, "dB")
+    print()
+    print("HD3:", HD3, "dB")
 
     os.remove("hd3_data.txt")
     os.remove("ctle.sp")

@@ -1,5 +1,5 @@
 """
-llm_optimizer.py  –  5-iteration DeepSeek feedback loop for CTLE sizing.
+llm_optimizer.py  –  5-iteration Claude feedback loop for CTLE sizing.
 
 Each iteration:
   1. Run frequency_response() → save PNG + collect metrics
@@ -16,9 +16,9 @@ import base64
 import importlib
 from pathlib import Path
 
-import time
+from anthropic import Anthropic
 
-from openai import OpenAI
+import time
 
 import core                                         # noqa: F401  (patches ngspice)
 globals().update(vars(core))
@@ -31,7 +31,7 @@ PARAMS_FILE  = Path("evaluation/params.py")
 SPECS_FILE   = Path("evaluation/specs.py")
 PLOTS_DIR    = Path("optimizer_plots")
 EYE_PLOTS_DIR = Path("eye_plots")
-N_ITERATIONS = 10
+N_ITERATIONS = 5
 
 
 def read_file(path: Path) -> str:
@@ -71,18 +71,13 @@ def ask_claude(
     eye_plot_path: Path,
 ) -> str:
 
-    client = OpenAI(
-        api_key=os.environ["DEEPSEEK_API_KEY"],
-        base_url="https://api.deepseek.com",
-    )
-
+    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     specs  = read_file(SPECS_FILE)
 
     system = (
         "You are an expert analog IC designer specialising in CMOS equaliser circuits "
         "for high-speed serial links. Your job is to iteratively improve the design "
-        "parameters of a CTLE implemented in the SKY130A process, based on simulation results. "
-        "Be concise in your analysis — identify the key issues quickly and output the updated params.py directly."
+        "parameters of a CTLE implemented in the SKY130A process, based on simulation results."
     )
 
     ibias_match = re.search(r'Ibias.*?=\s*([\d.e+-]+)', current_params_text)
@@ -94,7 +89,7 @@ def ask_claude(
         f"### Simulation results (iteration {iteration})\n\n"
         f"| Metric            | Value                        | Target                        |\n"
         f"|-------------------|------------------------------|-------------------------------|\n"
-        f"| DC gain           | {freq_metrics['dc_gain']:.2f} dB | Target ≈ 0 dB; minimize unnecessary DC gain/attenuation. |                             |\n"
+        f"| DC gain           | {freq_metrics['dc_gain']:.2f} dB         | Target close to 0 dB; avoid excessive negative gain.                             |\n"
         f"| Max Gain Frequency| {freq_metrics['peak_freq']/1e9:.2f} GHz         | Maximum gain frequency must be <= 2.5 GHz and >= 1.25GHz. Take care not to cross over.                             |\n"
         f"| Gain @ 2.5 GHz    | {freq_metrics['gain_at_nyquist']:.2f} dB | —                             |\n"
         f"| Boost (2.5G–DC)   | {freq_metrics['boost_db']:.2f} dB        | 3.0 – 12.0 dB                 |\n"
@@ -178,47 +173,45 @@ Do not add comments inside the dataclass.
     freq_image_b64 = encode_image(freq_plot_path)
     eye_image_b64  = encode_image(eye_plot_path)
 
-    print(f"[llm_optimizer] Iteration {iteration}: sending freq plot + eye plot + metrics to DeepSeek…")
+    print(f"[llm_optimizer] Iteration {iteration}: sending freq plot + eye plot + metrics to Claude…")
 
-    response = client.chat.completions.create(
-        model="deepseek-flash",
-        max_tokens=65536,
+    response = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=2048,
+        system=system,
         messages=[
-            {"role": "system", "content": system},
             {
                 "role": "user",
                 "content": [
                     {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": freq_image_b64,
+                        },
+                    },
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/png",
+                            "data": eye_image_b64,
+                        },
+                    },
+                    {
                         "type": "text",
                         "text": user_text,
                     },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{freq_image_b64}",
-                        },
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{eye_image_b64}",
-                        },
-                    },
                 ],
-            },
+            }
         ],
     )
 
-    choice = response.choices[0]
-    finish_reason = choice.finish_reason
-    reply = choice.message.content or ""
-    reasoning = getattr(choice.message, "reasoning_content", None) or ""
+    reply = response.content[0].text
 
-    print(f"\n── DeepSeek (iteration {iteration}) [finish_reason={finish_reason}, reasoning_tokens~={len(reasoning.split())}] ─")
-    if not reply:
-        print(f"[llm_optimizer] WARNING: empty reply from DeepSeek! full choice: {choice}")
-    else:
-        print(reply)
+    print(f"\n── Claude (iteration {iteration}) ──────────────────────────────────────────")
+    print(reply)
     print("───────────────────────────────────────────────────────────────────────────\n")
 
     return reply

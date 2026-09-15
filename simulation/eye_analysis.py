@@ -516,7 +516,7 @@ wrdata {data_file} v(voutp) v(voutn)
     )
 
     ax.set_title(
-        f"Channel + CTLE + Ideal 1-Tap DFE\n"
+        f"Channel + CTLE + 1-Tap DFE\n"
         f"EH = {eye_height * 1e3:.1f} mV, "
         f"EW = {eye_width:.2f} UI "
         f"[{'PASS' if passed else 'FAIL'}]",

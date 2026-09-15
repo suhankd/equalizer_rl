@@ -67,10 +67,6 @@ def eye_opening(
     pwl_vinp = _build_pwl(bits, +1)
     pwl_vinn = _build_pwl(bits, -1)
 
-    # =========================================================
-    # Channel + CTLE
-    # =========================================================
-
     circuit = Circuit("Channel + CTLE Eye")
 
     circuit.raw_spice += (
@@ -179,10 +175,6 @@ Vvin2 SRCN 0 {pwl_vinn}
         1e3
     )
 
-    # =========================================================
-    # NGSPICE
-    # =========================================================
-
     tag = uuid.uuid4().hex[:8]
 
     sp_file = f"_eye_{tag}.sp"
@@ -229,10 +221,6 @@ wrdata {data_file} v(voutp) v(voutn)
     voutp = data[:, 1]
     voutn = data[:, 2]
 
-    # =========================================================
-    # Ideal 1-tap DFE
-    # =========================================================
-
     vout_diff = apply_dfe(
         voutp - voutn,
         time,
@@ -246,18 +234,10 @@ wrdata {data_file} v(voutp) v(voutn)
     if os.path.exists(data_file):
         os.remove(data_file)
 
-    # =========================================================
-    # Remove settling
-    # =========================================================
-
     mask = time >= N_SETTLE * Tb
 
     time = time[mask]
     vout_diff = vout_diff[mask]
-
-    # =========================================================
-    # Phase alignment
-    # =========================================================
 
     phase_raw = np.mod(time, Tb)
     phase_edges = np.linspace(0, Tb, 51)
@@ -286,10 +266,6 @@ wrdata {data_file} v(voutp) v(voutn)
 
     t_aligned = time - t_crossing_phase
 
-    # =========================================================
-    # Fold eye
-    # =========================================================
-
     two_ui = 2.0 * Tb
 
     t_folded = np.mod(
@@ -302,10 +278,6 @@ wrdata {data_file} v(voutp) v(voutn)
     t_ui_single = (
         np.mod(t_aligned, Tb) / Tb
     )
-
-    # =========================================================
-    # Eye height
-    # =========================================================
 
     center_mask = (
         (t_ui_single >= 0.45) &
@@ -344,10 +316,6 @@ wrdata {data_file} v(voutp) v(voutn)
 
     else:
         eye_height = 0.0
-
-    # =========================================================
-    # Eye width
-    # =========================================================
 
     phase = np.mod(
         t_aligned,
@@ -422,10 +390,6 @@ wrdata {data_file} v(voutp) v(voutn)
         )
     )
 
-    # =========================================================
-    # Pass / fail
-    # =========================================================
-
     eye_width_pass = (
         eye_width >= EYE_WIDTH_MIN
     )
@@ -463,10 +427,6 @@ wrdata {data_file} v(voutp) v(voutn)
         f"Overall eye spec : "
         f"{'PASS' if passed else 'FAIL'}"
     )
-
-    # =========================================================
-    # Plot
-    # =========================================================
 
     fig, ax = plt.subplots(
         figsize=(9, 5),

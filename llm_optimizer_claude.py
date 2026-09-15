@@ -226,7 +226,6 @@ def run():
         print(f"  ITERATION {iteration} / {N_ITERATIONS}")
         print(f"{'='*60}\n")
 
-        # ── load current params ──────────────────────────────────────
         params = load_params()
         kwargs = dict(
             W=params.W,
@@ -237,7 +236,6 @@ def run():
             Ibias=params.Ibias,
         )
 
-        # ── run simulations ──────────────────────────────────────────
         freq_plot_path = PLOTS_DIR / f"iter_{iteration:02d}_freq_response.png"
         eye_plot_path  = EYE_PLOTS_DIR / f"iter_{iteration:02d}_eye.png"
 
@@ -261,7 +259,6 @@ def run():
             f"({'PASS' if eye_metrics['eye_width_pass'] else 'FAIL'})\n"
         )
 
-        # ── ask Claude ───────────────────────────────────────────────
         current_params_text = read_file(PARAMS_FILE)
         reply = ask_claude(
             iteration=iteration,
@@ -273,7 +270,6 @@ def run():
             eye_plot_path=eye_plot_path,
         )
 
-        # ── update params.py ─────────────────────────────────────────
         new_params = extract_code_block(reply)
         if new_params is None:
             print(f"[llm_optimizer] WARNING: no ```python block found in iteration {iteration}. "

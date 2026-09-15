@@ -20,7 +20,7 @@ import time
 
 from openai import OpenAI
 
-import core                                         # noqa: F401  (patches ngspice)
+import core                                      
 globals().update(vars(core))
 
 from simulation.frequency_response import frequency_response
@@ -78,12 +78,11 @@ def compute_composite_reward(freq_metrics: dict, eye_metrics: dict) -> float:
     W = eye_metrics.get("eye_width", 0.0)
     G_DC = freq_metrics.get("dc_gain", 0.0)
     B = freq_metrics.get("boost_db", 0.0)
-    f_p = freq_metrics.get("peak_freq", 0.0) / 1e9  # Convert Hz to GHz
+    f_p = freq_metrics.get("peak_freq", 0.0) / 1e9
 
     term_H = min(H / 0.1, 1.0)
     term_W = min(W / 0.4, 1.0)
 
-    # Peaking Boost Score (S_B)
     if B < 3.0:
         S_B = B / 3.0
     elif B <= 12.0:
@@ -91,7 +90,6 @@ def compute_composite_reward(freq_metrics: dict, eye_metrics: dict) -> float:
     else:
         S_B = 12.0 / B
 
-    # Peak Frequency Score (S_F)
     if f_p < 1.25:
         S_F = f_p / 1.25
     elif f_p <= 2.5:
@@ -99,7 +97,6 @@ def compute_composite_reward(freq_metrics: dict, eye_metrics: dict) -> float:
     else:
         S_F = 2.5 / f_p
 
-    # DC Gain Penalty term
     term_dc = math.exp(-abs(G_DC))
 
     R = (1.0 / 5.0) * (term_H + term_W + S_B + S_F + term_dc)
@@ -281,7 +278,6 @@ def run():
         print(f"  ITERATION {iteration} / {N_ITERATIONS}")
         print(f"{'='*60}\n")
 
-        # ── load current params ──────────────────────────────────────
         params = load_params()
         kwargs = dict(
             W=params.W,
@@ -292,7 +288,6 @@ def run():
             Ibias=params.Ibias,
         )
 
-        # ── run simulations ──────────────────────────────────────────
         freq_plot_path = PLOTS_DIR / f"iter_{iteration:02d}_freq_response.png"
         eye_plot_path  = EYE_PLOTS_DIR / f"iter_{iteration:02d}_eye.png"
 
@@ -318,7 +313,6 @@ def run():
             f"Composite Reward R = {reward:.4f}\n"
         )
 
-        # ── ask Claude ───────────────────────────────────────────────
         current_params_text = read_file(PARAMS_FILE)
         reply = ask_claude(
             iteration=iteration,

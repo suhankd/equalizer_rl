@@ -48,8 +48,6 @@ def pvt_analysis(W, L, Rs, Cs, Rd, Ibias, save_path="pvt_heatmap.png"):
                     corner=corner, Vdd=vdd, temperature=temperature
                 )
 
-                # ----- normalized specification score -----
-
                 boost_score = min(
                     max((freq["boost_db"] - 3) / 9, 0),
                     1
@@ -93,7 +91,6 @@ def pvt_analysis(W, L, Rs, Cs, Rd, Ibias, save_path="pvt_heatmap.png"):
 
             row += 1
 
-    # ---------- Heatmap ----------
     fig, ax = plt.subplots(figsize=(10, 8))
 
     im = ax.imshow(
@@ -117,7 +114,6 @@ def pvt_analysis(W, L, Rs, Cs, Rd, Ibias, save_path="pvt_heatmap.png"):
     cbar = plt.colorbar(im)
     cbar.set_label("Specification Score")
 
-    # annotate pass/fail
     for i in range(heatmap.shape[0]):
         for j in range(heatmap.shape[1]):
             txt = "✓" if heatmap[i, j] > 0.99 else ""

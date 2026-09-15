@@ -183,10 +183,6 @@ Vck ck 0 PULSE(
         'Nchannel_OUTPUT'
     )
 
-    # ---------------------------------------------------------
-    # Single CTLE
-    # ---------------------------------------------------------
-
     circuit.X(
         'CTLE',
         'ctle',
@@ -196,10 +192,6 @@ Vck ck 0 PULSE(
         'voutn',
         'vdd'
     )
-
-    # ---------------------------------------------------------
-    # Transient simulation
-    # ---------------------------------------------------------
 
     simulator = circuit.simulator(
         temperature=temperature,
@@ -211,27 +203,12 @@ Vck ck 0 PULSE(
         end_time=1e-9
     )
 
-    # ---------------------------------------------------------
-    # Differential CTLE output
-    # ---------------------------------------------------------
-
     t = np.array(analysis.time)
 
     voutp = np.array(analysis.voutp)
     voutn = np.array(analysis.voutn)
 
     vout_diff = voutp - voutn
-
-    # ---------------------------------------------------------
-    # Sample at the receiver clock
-    # ---------------------------------------------------------
-    #
-    # h0 = response at the first sampling instant
-    #
-    # h1 = response exactly one UI later
-    #
-    # No peak detection is used.
-    # ---------------------------------------------------------
 
     t_h0 = SAMPLE_TIME
     t_h1 = SAMPLE_TIME + UI
@@ -242,15 +219,7 @@ Vck ck 0 PULSE(
     h0 = vout_diff[i0]
     h1 = vout_diff[i1]
 
-    # ---------------------------------------------------------
-    # DFE coefficient
-    # ---------------------------------------------------------
-
     coefficient = h1 / h0
-
-    # ---------------------------------------------------------
-    # Results
-    # ---------------------------------------------------------
 
     print(f"Sampling time       = {t[i0] * 1e12:.2f} ps")
     print(f"Main cursor h0      = {h0:.6f} V")

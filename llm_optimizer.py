@@ -61,6 +61,51 @@ def encode_image(path: Path) -> str:
     return base64.standard_b64encode(path.read_bytes()).decode("utf-8")
 
 
+def compute_composite_reward(freq_metrics: dict, eye_metrics: dict) -> float:
+    """
+    Computes the RL composite reward function R in [0, 1]:
+      R = 1/5 * [ min(H / 0.1, 1) + min(W / 0.4, 1) + S_B + S_F + exp(-|G_DC|) ]
+    where:
+      H    : Eye height in Volts
+      W    : Eye width in UI
+      S_B  : Peaking boost score based on boost_db
+      S_F  : Peak frequency score based on peak_freq in GHz
+      G_DC : DC gain in dB
+    """
+    import math
+
+    H = eye_metrics.get("eye_height", 0.0)
+    W = eye_metrics.get("eye_width", 0.0)
+    G_DC = freq_metrics.get("dc_gain", 0.0)
+    B = freq_metrics.get("boost_db", 0.0)
+    f_p = freq_metrics.get("peak_freq", 0.0) / 1e9  # Convert Hz to GHz
+
+    term_H = min(H / 0.1, 1.0)
+    term_W = min(W / 0.4, 1.0)
+
+    # Peaking Boost Score (S_B)
+    if B < 3.0:
+        S_B = B / 3.0
+    elif B <= 12.0:
+        S_B = 1.0
+    else:
+        S_B = 12.0 / B
+
+    # Peak Frequency Score (S_F)
+    if f_p < 1.25:
+        S_F = f_p / 1.25
+    elif f_p <= 2.5:
+        S_F = 1.0
+    else:
+        S_F = 2.5 / f_p
+
+    # DC Gain Penalty term
+    term_dc = math.exp(-abs(G_DC))
+
+    R = (1.0 / 5.0) * (term_H + term_W + S_B + S_F + term_dc)
+    return float(R)
+
+
 def ask_claude(
     iteration: int,
     current_params_text: str,
@@ -89,13 +134,14 @@ def ask_claude(
     power_mw = 2 * float(ibias_match.group(1)) * 1.8 * 1000 if ibias_match else 0.0
 
     eye_height_mv = eye_metrics["eye_height"] * 1e3
+    composite_reward = compute_composite_reward(freq_metrics, eye_metrics)
 
     metrics_summary = (
         f"### Simulation results (iteration {iteration})\n\n"
         f"| Metric            | Value                        | Target                        |\n"
         f"|-------------------|------------------------------|-------------------------------|\n"
-        f"| DC gain           | {freq_metrics['dc_gain']:.2f} dB | Target ≈ 0 dB; minimize unnecessary DC gain/attenuation. |                             |\n"
-        f"| Max Gain Frequency| {freq_metrics['peak_freq']/1e9:.2f} GHz         | Maximum gain frequency must be <= 2.5 GHz and >= 1.25GHz. Take care not to cross over.                             |\n"
+        f"| DC gain           | {freq_metrics['dc_gain']:.2f} dB | Target ≈ 0 dB; minimize unnecessary DC gain/attenuation. |\n"
+        f"| Max Gain Frequency| {freq_metrics['peak_freq']/1e9:.2f} GHz         | Maximum gain frequency must be <= 2.5 GHz and >= 1.25GHz. Take care not to cross over. |\n"
         f"| Gain @ 2.5 GHz    | {freq_metrics['gain_at_nyquist']:.2f} dB | —                             |\n"
         f"| Boost (2.5G–DC)   | {freq_metrics['boost_db']:.2f} dB        | 3.0 – 12.0 dB                 |\n"
         f"| Peak gain         | {freq_metrics['peak_gain']:.2f} dB @ {freq_metrics['peak_freq']/1e9:.2f} GHz | peak in 1.25–2.5 GHz |\n"
@@ -104,6 +150,7 @@ def ask_claude(
         f"| Eye Height        | {eye_height_mv:.1f} mV       | >= 100 mV {'✓ PASS' if eye_metrics['eye_height_pass'] else '✗ FAIL'}  |\n"
         f"| Eye Width         | {eye_metrics['eye_width']:.3f} UI      | >= 0.4 UI {'✓ PASS' if eye_metrics['eye_width_pass'] else '✗ FAIL'}  |\n"
         f"| Eye Overall       | {'PASS' if eye_metrics['passed'] else 'FAIL'}                    | Both EH and EW pass           |\n"
+        f"| Composite Reward R| {composite_reward:.4f}                   | Maximize R -> 1.0 (RL score)  |\n"
     )
 
     user_text = f"""
@@ -167,6 +214,7 @@ For this iteration:
    only approximate design intuition.
 6. Respect ALL parameter constraints.
 7. You MUST also tune `dfe_coefficient` if the eye metrics are not passing.
+8. Aim to maximize the composite reward score R (target 1.0).
 
 Output the complete updated `params.py` in exactly ONE ```python``` block.
 
@@ -261,11 +309,13 @@ def run():
             coefficient=params.dfe_coefficient,
             save_path=eye_plot_path,
         )
+        reward = compute_composite_reward(freq_metrics, eye_metrics)
         print(
             f"Eye height = {eye_metrics['eye_height']*1e3:.1f} mV  "
             f"({'PASS' if eye_metrics['eye_height_pass'] else 'FAIL'}), "
             f"Eye width = {eye_metrics['eye_width']:.3f} UI  "
-            f"({'PASS' if eye_metrics['eye_width_pass'] else 'FAIL'})\n"
+            f"({'PASS' if eye_metrics['eye_width_pass'] else 'FAIL'}), "
+            f"Composite Reward R = {reward:.4f}\n"
         )
 
         # ── ask Claude ───────────────────────────────────────────────
